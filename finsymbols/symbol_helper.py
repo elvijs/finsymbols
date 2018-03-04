@@ -4,21 +4,19 @@ except ImportError:  # python3
     import urllib.request as urllib
 import os
 import datetime
-import sys
 import finsymbols
-import pprint
 import csv
 import re
 
 
-def get_symbol_list(symbol_data, exchange_name):
+class SymbolFetchException(Exception):
+    """A generic exception class for any issues with fetching symbol web data"""
 
-    csv_file = exchange_name + '.csv'
 
+def get_symbol_list(symbol_data):
     symbol_list = list()
     symbol_data = re.split("\r?\n", symbol_data)
 
-    headers = symbol_data[0]
     # symbol,company,sector,industry,headquaters
     symbol_data = list(csv.reader(symbol_data, delimiter=','))
     # We need to cut off the the last row because it is a null string
@@ -34,12 +32,15 @@ def get_symbol_list(symbol_data, exchange_name):
 
 
 def save_file(file_path, file_data):
+    """Save byte or string data to file_path"""
     if isinstance(file_data, str):
-        with open(file_path, "w") as saved_file:
-            saved_file.write(file_data)
+        mode = "w"
     elif isinstance(file_data, bytes):
-        with open(file_path, "wb") as saved_file:
-            saved_file.write(file_data.encode('utf-8'))
+        mode = "wb"
+    else:
+        raise TypeError("expected str or bytes, got " + type(file_data))
+    with open(file_path, mode) as saved_file:
+        saved_file.write(file_data)
 
 
 def get_exchange_url(exchange):
@@ -48,9 +49,7 @@ def get_exchange_url(exchange):
 
 
 def is_cached(file_path):
-    '''
-    Checks if the file cached is still valid
-    '''
+    """Checks if the file cached is still valid"""
     if not os.path.exists(file_path):
         return False
 
@@ -65,9 +64,7 @@ def is_cached(file_path):
 
 
 def fetch_file(url):
-    '''
-    Gets and downloads files
-    '''
+    """Gets and downloads files"""
     file_fetcher = urllib.build_opener()
     file_fetcher.addheaders = [('User-agent', 'Mozilla/5.0')]
     file_data = file_fetcher.open(url).read()
@@ -78,19 +75,23 @@ def fetch_file(url):
 
 
 def wiki_html(url, file_name):
-    '''
+    """
     Obtains html from Wikipedia
     Note: API exist but for my use case. Data returned was not parsable. Preferred to use html
     python-wikitools - http://code.google.com/p/python-wikitools/
     Ex. http://en.wikipedia.org/w/api.php?format=xml&action=query&titles=List_of_S%26P_500_companies&prop=revisions&rvprop=content
-    '''
+    """
     file_path = os.path.join(os.path.dirname(finsymbols.__file__), file_name)
 
     if is_cached(file_path):
         with open(file_path, "rb") as sp500_file:
             return sp500_file.read()
     else:
-        wiki_html = fetch_file('http://en.wikipedia.org/wiki/{}'.format(url))
-        # Save file to be used by cache
-        save_file(file_path, wiki_html)
-        return wiki_html
+        html = fetch_file('http://en.wikipedia.org/wiki/{}'.format(url))
+        # Save file to be used by cache, but only if the request was successful
+        if html:
+            save_file(file_path, html)
+        else:
+            raise SymbolFetchException
+
+        return html
