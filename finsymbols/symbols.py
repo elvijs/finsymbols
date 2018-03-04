@@ -1,5 +1,3 @@
-import pprint
-import sys
 from bs4 import BeautifulSoup
 from finsymbols.symbol_helper import *
 
@@ -59,6 +57,9 @@ def _get_exchange_data(exchange):
             symbol_data = cached_file.read()
     else:
         symbol_data = fetch_file(url)
-        save_file(file_path, symbol_data)
+        if symbol_data:
+            save_file(file_path, symbol_data)
+        else:
+            raise SymbolFetchException
 
-    return get_symbol_list(symbol_data, exchange)
+    return get_symbol_list(symbol_data)
